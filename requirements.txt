@@ -1,0 +1,5 @@
+websocket-client
+python-binance
+pandas
+matplotlib
+cryptoxlib-aio

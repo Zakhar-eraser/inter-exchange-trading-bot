@@ -11,5 +11,6 @@ async def get_cross_pairs(pairs_1: list[CoinPair], pairs_2: list[CoinPair]) -> l
     return cross_pairs
 
 async def filter_pairs_by_coin(pairs: list[CoinPair], symbol: str) -> list[CoinPair]:
-    filtered_pairs = [pair for pair in pairs if pair.base == symbol or pair.quote == symbol]
+    if symbol != None and symbol != '':
+        filtered_pairs = [pair for pair in pairs if pair.base == symbol or pair.quote == symbol]
     return filtered_pairs

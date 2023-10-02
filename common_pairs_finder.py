@@ -1,39 +1,35 @@
-from keys import BINANCE_KEY
-from keys import BITFOREX_KEY
-from lib.structures.Pair import CoinPair
-from lib.structures.BitforexMClient import BitforexMClient
-from lib.structures.BinanceMClient import BinanceMClient
 from lib.pairs_filters import get_cross_pairs
 from lib.pairs_filters import filter_pairs_by_coin
 from lib.project_manager import load_or_create_pairs
+from lib.project_manager import Strings
 from lib.project_manager import initialize_project
+from lib.project_manager import get_trading_client
+from lib.project_manager import get_base_client
+from lib.structures.Pair import CoinPair
 
 import asyncio
 
-#LOG = logging.getLogger("cryptoxlib")
-#LOG.setLevel(logging.DEBUG)
-#LOG.addHandler(logging.StreamHandler())
+async def load_filtered_cross_pairs(trading_client, base_client, base_coin: str) -> list[CoinPair]:
+    pairs = await load_pairs(trading_client, base_client)
+    return await filter_pairs_by_coin(await load_or_create_pairs(Strings.TRADING_MARKET_NAME,
+                                                                 lambda: asyncio.create_task(get_cross_pairs(*pairs))),
+                                                                 base_coin)
 
-BINANCE_PAIRS_FILE = 'binanace.prs'
-BITFOREX_PAIRS_FILE = 'bitforex.prs'
-BINANCE_BITFOREX_FILE = 'binance_bitforex.prs'
-BINANCE_BITFOREX_FILTERED_FILE = 'binance_bitforex_filtered.prs'
+async def load_pairs(trading_client, base_client) -> [list[CoinPair], list[CoinPair]]:
+    return await asyncio.gather(load_or_create_pairs(Strings.TRADING_MARKET_NAME,
+                                                      lambda: asyncio.create_task(trading_client.get_all_pairs())),
+                                load_or_create_pairs(Strings.BASE_MARKET_NAME,
+                                                      lambda: asyncio.create_task(base_client.get_all_pairs())))
 
 async def main() -> None:
     initialize_project()
-    bitforex_client = BitforexMClient(*BITFOREX_KEY)
-    binance_client = BinanceMClient(*BINANCE_KEY)
-    pairs = await asyncio.gather(load_or_create_pairs(BITFOREX_PAIRS_FILE,
-                                                      asyncio.create_task(bitforex_client.get_all_pairs())),
-                                 load_or_create_pairs(BINANCE_PAIRS_FILE,
-                                                      asyncio.create_task(binance_client.get_all_pairs())))
-    binance_bitforex_pairs = await load_or_create_pairs(BINANCE_BITFOREX_FILE,
-                                                        asyncio.create_task(get_cross_pairs(*pairs)))
-    filtered_binance_bitforex_pairs = await load_or_create_pairs(BINANCE_BITFOREX_FILTERED_FILE, 
-                                                                 asyncio.create_task(filter_pairs_by_coin(binance_bitforex_pairs,
-                                                                                                          'USDT')))
-    await asyncio.gather(bitforex_client.close(), binance_client.close())
-    print(filtered_binance_bitforex_pairs)
+    trading_client = get_trading_client()
+    base_client = get_base_client()
+    filtered_cross_pairs = await load_or_create_pairs(Strings.FILTERED_PAIRS, 
+                                                                 lambda: asyncio.create_task(load_filtered_cross_pairs(trading_client, base_client,
+                                                                                                              Strings.QUOTE_COIN)))
+    await asyncio.gather(trading_client.close(), base_client.close())
+    print(filtered_cross_pairs)
 
 if __name__ == '__main__':
     asyncio.run(main())
